@@ -88,7 +88,7 @@ def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk
             if use_gpu:
                 batch_x_val, batch_y_val = batch_x_val.cuda(), batch_y_val.cuda()
             batch_output_val = model(batch_x_val)
-            batch_proba = F.softmax(batch_output_val)
+            batch_proba = F.softmax(batch_output_val, dim=-1)
             # Store batch probas and labels
             list_val_proba.append(batch_proba)
             list_val_labels.append(batch_y_val)
@@ -171,7 +171,7 @@ def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_att
             if use_gpu:
                 batch_x_test, batch_y_test = batch_x_test.cuda(), batch_y_test.cuda()
             batch_output_test = model(batch_x_test)
-            batch_proba_test = F.softmax(batch_output_test)
+            batch_proba_test = F.softmax(batch_output_test, dim=-1)
             loss_batch_test = criteria(batch_output_test, batch_y_test)
             loss_epoch_test += loss_batch_test.item()
 

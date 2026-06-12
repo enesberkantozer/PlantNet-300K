@@ -25,6 +25,7 @@ def _add_training_parser(parser):
     group_training.add_argument('--epoch_decay', nargs='+', type=int, default=[])
     group_training.add_argument('--k', nargs='+', help='value of k for computing the topk loss and computing topk accuracy',
                                 required=True, type=int)
+    group_training.add_argument('--optimizer', choices=['sgd', 'adam', 'adamw'], default='sgd', help='choose the optimizer')
 
 
 def _add_model_parser(parser):

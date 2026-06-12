@@ -4,7 +4,7 @@ import pickle
 import argparse
 import time
 import torch
-from torch.optim import SGD
+from torch.optim import SGD, Adam, AdamW
 from torch.nn import CrossEntropyLoss
 
 from utils import set_seed, load_model, save, get_model, update_optimizer, get_data
@@ -27,7 +27,12 @@ def train(args):
         model.cuda()
         criteria.cuda()
 
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.mu, nesterov=True)
+    if args.optimizer == 'sgd':
+        optimizer = SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.mu, nesterov=True)
+    elif args.optimizer == 'adam':
+        optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.mu)
+    elif args.optimizer == 'adamw':
+        optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.mu)
 
     # Containers for storing metrics over epochs
     loss_train, acc_train, topk_acc_train = [], [], []
@@ -46,9 +51,10 @@ def train(args):
     lmbda_best_acc = None
     best_val_acc = float('-inf')
 
-    for epoch in tqdm(range(args.n_epochs), desc='epoch', position=0):
+    for epoch in range(1, args.n_epochs + 1):
+        print(f"\n[{epoch}/{args.n_epochs}] Starting epoch...")
         t = time.time()
-        optimizer = update_optimizer(optimizer, lr_schedule=args.epoch_decay, epoch=epoch)
+        optimizer = update_optimizer(optimizer, lr_schedule=args.epoch_decay, epoch=epoch-1)
 
         loss_epoch_train, acc_epoch_train, topk_acc_epoch_train, p_train, r_train, f_train = train_epoch(model, optimizer, train_loader,
                                                                               criteria, loss_train, acc_train,
@@ -79,8 +85,8 @@ def train(args):
             save(model, optimizer, epoch, os.path.join(save_dir, save_name + '_weights_best_acc.tar'))
 
         # Create DataFrame and save CSV
-        df = pd.DataFrame({
-            'epoch': list(range(epoch + 1)),
+        df_dict = {
+            'epoch': list(range(1, epoch + 1)),
             'train_loss': loss_train,
             'train_acc': acc_train,
             'train_precision': prec_train,
@@ -91,29 +97,40 @@ def train(args):
             'val_precision': prec_val,
             'val_recall': rec_val,
             'val_f1': f1_val
-        })
+        }
+        for k in args.k:
+            df_dict[f'train_top{k}_acc'] = [d[k] for d in topk_acc_train]
+            df_dict[f'val_top{k}_acc'] = [d[k] for d in topk_acc_val]
+            
+        df = pd.DataFrame(df_dict)
         df.to_csv(os.path.join(save_dir, save_name + '_metrics.csv'), index=False)
         
         # Plotting
-        plt.figure(figsize=(15, 10))
         metrics_to_plot = [('Loss', loss_train, loss_val), ('Accuracy', acc_train, acc_val),
                            ('Precision', prec_train, prec_val), ('Recall', rec_train, rec_val),
                            ('F1 Score', f1_train, f1_val)]
+        for k in args.k:
+            metrics_to_plot.append((f'Top-{k} Accuracy', [d[k] for d in topk_acc_train], [d[k] for d in topk_acc_val]))
+            
+        n_metrics = len(metrics_to_plot)
+        cols = 3
+        rows = (n_metrics + cols - 1) // cols
+        plt.figure(figsize=(15, 5 * rows))
         for i, (name, t_metric, v_metric) in enumerate(metrics_to_plot):
-            plt.subplot(2, 3, i+1)
-            plt.plot(t_metric, label=f'Train {name}')
-            plt.plot(v_metric, label=f'Val {name}')
+            plt.subplot(rows, cols, i+1)
+            plt.plot(range(1, epoch + 1), t_metric, label=f'Train {name}', marker='o')
+            plt.plot(range(1, epoch + 1), v_metric, label=f'Val {name}', marker='s')
             plt.title(name)
             plt.xlabel('Epoch')
             plt.legend()
+            plt.grid(True)
         plt.tight_layout()
         plt.savefig(os.path.join(save_dir, save_name + '_metrics_plot.png'))
         plt.close()
 
-        print()
-        print(f'epoch {epoch} took {time.time()-t:.2f}')
-        print(f'Train -> loss: {loss_epoch_train:.4f} | acc: {acc_epoch_train:.4f} | p: {p_train:.4f} | r: {r_train:.4f} | f1: {f_train:.4f}')
-        print(f'Val   -> loss: {loss_epoch_val:.4f} | acc: {acc_epoch_val:.4f} | p: {p_val:.4f} | r: {r_val:.4f} | f1: {f_val:.4f}')
+        print(f'\n--- Epoch {epoch}/{args.n_epochs} (Took {time.time()-t:.2f}s) ---')
+        print(f'Train | Loss: {loss_epoch_train:.4f} | Acc: {acc_epoch_train:.4f} | Prec: {p_train:.4f} | Rec: {r_train:.4f} | F1: {f_train:.4f}')
+        print(f'Val   | Loss: {loss_epoch_val:.4f} | Acc: {acc_epoch_val:.4f} | Prec: {p_val:.4f} | Rec: {r_val:.4f} | F1: {f_val:.4f}\n')
 
     # load weights corresponding to best val accuracy and evaluate on test
     load_model(model, os.path.join(save_dir, save_name + '_weights_best_acc.tar'), args.use_gpu)
@@ -123,20 +140,29 @@ def train(args):
                                                   dataset_attributes)
 
     # Save test metrics
-    test_df = pd.DataFrame({
+    test_df_dict = {
         'test_loss': [loss_test_ba],
         'test_acc': [acc_test_ba],
         'test_precision': [p_test],
         'test_recall': [r_test],
         'test_f1': [f_test]
-    })
+    }
+    for k in args.k:
+        test_df_dict[f'test_top{k}_acc'] = [topk_acc_test_ba[k]]
+        
+    test_df = pd.DataFrame(test_df_dict)
     test_df.to_csv(os.path.join(save_dir, save_name + '_test_metrics.csv'), index=False)
     
     # Plot test metrics as a bar chart
-    plt.figure(figsize=(8, 6))
-    plt.bar(['Accuracy', 'Precision', 'Recall', 'F1 Score'], [acc_test_ba, p_test, r_test, f_test], color=['blue', 'green', 'orange', 'red'])
+    test_metrics_keys = ['Accuracy', 'Precision', 'Recall', 'F1 Score'] + [f'Top-{k} Acc' for k in args.k]
+    test_metrics_vals = [acc_test_ba, p_test, r_test, f_test] + [topk_acc_test_ba[k] for k in args.k]
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(test_metrics_keys, test_metrics_vals, color='royalblue')
     plt.title('Test Metrics')
     plt.ylim([0, 1])
+    plt.xticks(rotation=45)
+    plt.tight_layout()
     plt.savefig(os.path.join(save_dir, save_name + '_test_metrics_plot.png'))
     plt.close()
 
