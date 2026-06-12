@@ -8,5 +8,6 @@ dependencies:
   - torchvision
   - pip:
       - timm
-
-
+      - pandas
+      - matplotlib
+      - scikit-learn

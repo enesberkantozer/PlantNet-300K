@@ -5,6 +5,8 @@ from utils import count_correct_topk, count_correct_avgk, update_correct_per_cla
 
 import torch.nn.functional as F
 from collections import defaultdict
+import numpy as np
+from sklearn.metrics import precision_recall_fscore_support
 
 
 def train_epoch(model, optimizer, train_loader, criteria, loss_train, acc_train, topk_acc_train, list_k, n_train, use_gpu):
@@ -16,6 +18,9 @@ def train_epoch(model, optimizer, train_loader, criteria, loss_train, acc_train,
     # Containers for tracking nb of correctly classified examples (in the top-k sense) and top-k accuracy for each k in list_k
     n_correct_topk_train = defaultdict(int)
     topk_acc_epoch_train = {}
+    
+    all_preds_train = []
+    all_targets_train = []
 
     for batch_idx, (batch_x_train, batch_y_train) in enumerate(tqdm(train_loader, desc='train', position=0)):
         if use_gpu:
@@ -30,9 +35,13 @@ def train_epoch(model, optimizer, train_loader, criteria, loss_train, acc_train,
 
         # Update variables
         with torch.no_grad():
-            n_correct_train += torch.sum(torch.eq(batch_y_train, torch.argmax(batch_output_train, dim=-1))).item()
+            preds = torch.argmax(batch_output_train, dim=-1)
+            n_correct_train += torch.sum(torch.eq(batch_y_train, preds)).item()
             for k in list_k:
                 n_correct_topk_train[k] += count_correct_topk(scores=batch_output_train, labels=batch_y_train, k=k).item()
+            
+            all_preds_train.extend(preds.cpu().numpy())
+            all_targets_train.extend(batch_y_train.cpu().numpy())
 
     # At the end of epoch compute average of statistics over batches and store them
     with torch.no_grad():
@@ -44,8 +53,10 @@ def train_epoch(model, optimizer, train_loader, criteria, loss_train, acc_train,
         loss_train.append(loss_epoch_train)
         acc_train.append(epoch_accuracy_train)
         topk_acc_train.append(topk_acc_epoch_train)
+        
+        precision, recall, f1, _ = precision_recall_fscore_support(all_targets_train, all_preds_train, average='macro', zero_division=0)
 
-    return loss_epoch_train, epoch_accuracy_train, topk_acc_epoch_train
+    return loss_epoch_train, epoch_accuracy_train, topk_acc_epoch_train, precision, recall, f1
 
 
 def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk_acc_val,
@@ -72,6 +83,7 @@ def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk
         # Store estimated probas and labels of the whole validation set to compute lambda
         list_val_proba = []
         list_val_labels = []
+        all_preds_val = []
         for batch_idx, (batch_x_val, batch_y_val) in enumerate(tqdm(val_loader, desc='val', position=0)):
             if use_gpu:
                 batch_x_val, batch_y_val = batch_x_val.cuda(), batch_y_val.cuda()
@@ -84,8 +96,11 @@ def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk
             loss_batch_val = criteria(batch_output_val, batch_y_val)
             loss_epoch_val += loss_batch_val.item()
 
-            n_correct_val += torch.sum(torch.eq(batch_y_val, torch.argmax(batch_output_val, dim=-1))).item()
+            preds = torch.argmax(batch_output_val, dim=-1)
+            n_correct_val += torch.sum(torch.eq(batch_y_val, preds)).item()
             update_correct_per_class(batch_proba, batch_y_val, class_acc_dict['class_acc'])
+            
+            all_preds_val.extend(preds.cpu().numpy())
             # Update top-k count and top-k count for each class
             for k in list_k:
                 n_correct_topk_val[k] += count_correct_topk(scores=batch_output_val, labels=batch_y_val, k=k).item()
@@ -126,8 +141,10 @@ def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk
         topk_acc_val.append(topk_acc_epoch_val)
         avgk_acc_val.append(avgk_acc_epoch_val)
         class_acc_val.append(class_acc_dict)
+        
+        precision, recall, f1, _ = precision_recall_fscore_support(val_labels.cpu().numpy(), all_preds_val, average='macro', zero_division=0)
 
-    return loss_epoch_val, epoch_accuracy_val, topk_acc_epoch_val, avgk_acc_epoch_val, lmbda_val
+    return loss_epoch_val, epoch_accuracy_val, topk_acc_epoch_val, avgk_acc_epoch_val, lmbda_val, precision, recall, f1
 
 
 def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_attributes):
@@ -147,6 +164,9 @@ def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_att
         for k in list_k:
             class_acc_dict['class_topk_acc'][k], class_acc_dict['class_avgk_acc'][k] = defaultdict(int), defaultdict(int)
 
+        all_preds_test = []
+        all_targets_test = []
+
         for batch_idx, (batch_x_test, batch_y_test) in enumerate(tqdm(test_loader, desc='test', position=0)):
             if use_gpu:
                 batch_x_test, batch_y_test = batch_x_test.cuda(), batch_y_test.cuda()
@@ -155,8 +175,12 @@ def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_att
             loss_batch_test = criteria(batch_output_test, batch_y_test)
             loss_epoch_test += loss_batch_test.item()
 
-            n_correct_test += torch.sum(torch.eq(batch_y_test, torch.argmax(batch_output_test, dim=-1))).item()
+            preds = torch.argmax(batch_output_test, dim=-1)
+            n_correct_test += torch.sum(torch.eq(batch_y_test, preds)).item()
             update_correct_per_class(batch_proba_test, batch_y_test, class_acc_dict['class_acc'])
+            
+            all_preds_test.extend(preds.cpu().numpy())
+            all_targets_test.extend(batch_y_test.cpu().numpy())
             for k in list_k:
                 n_correct_topk_test[k] += count_correct_topk(scores=batch_output_test, labels=batch_y_test, k=k).item()
                 n_correct_avgk_test[k] += count_correct_avgk(probas=batch_proba_test, labels=batch_y_test, lmbda=lmbda[k]).item()
@@ -177,4 +201,6 @@ def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_att
                 class_acc_dict['class_topk_acc'][k][class_id] = class_acc_dict['class_topk_acc'][k][class_id] / n_class_test
                 class_acc_dict['class_avgk_acc'][k][class_id] = class_acc_dict['class_avgk_acc'][k][class_id] / n_class_test
 
-    return loss_epoch_test, acc_epoch_test, topk_acc_epoch_test, avgk_acc_epoch_test, class_acc_dict
+        precision, recall, f1, _ = precision_recall_fscore_support(all_targets_test, all_preds_test, average='macro', zero_division=0)
+
+    return loss_epoch_test, acc_epoch_test, topk_acc_epoch_test, avgk_acc_epoch_test, class_acc_dict, precision, recall, f1
