@@ -91,8 +91,10 @@ def save(model, optimizer, epoch, location):
     if not os.path.exists(dir):
         os.makedirs(dir)
 
+    model_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
+
     d = {'epoch': epoch,
-         'model': model.state_dict(),
+         'model': model_state,
          'optimizer': optimizer.state_dict()}
     torch.save(d, location)
 

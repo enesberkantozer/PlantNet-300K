@@ -23,7 +23,11 @@ def train(args):
 
     if args.use_gpu:
         print('USING GPU')
-        torch.cuda.set_device(0)
+        if args.num_gpus > 1 and torch.cuda.device_count() >= args.num_gpus:
+            print(f'USING {args.num_gpus} GPUs!')
+            model = torch.nn.DataParallel(model, device_ids=list(range(args.num_gpus)))
+        else:
+            torch.cuda.set_device(0)
         model.cuda()
         criteria.cuda()
 

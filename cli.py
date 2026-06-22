@@ -44,6 +44,7 @@ def _add_model_parser(parser):
 def _add_hardware_parser(parser):
     group_hardware = parser.add_argument_group('Hardware parameters')
     group_hardware.add_argument('--use_gpu', type=int, choices=[0, 1], default=torch.cuda.is_available())
+    group_hardware.add_argument('--num_gpus', type=int, default=1, help='Number of GPUs to use for training')
 
 
 def _add_misc_parser(parser):
