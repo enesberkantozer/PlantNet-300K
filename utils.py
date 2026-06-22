@@ -9,7 +9,7 @@ from collections import Counter
 
 from torchvision.models import resnet18, resnet34, resnet50, resnet101, resnet152, inception_v3, mobilenet_v2, densenet121, \
     densenet161, densenet169, densenet201, alexnet, squeezenet1_0, shufflenet_v2_x1_0, wide_resnet50_2, wide_resnet101_2,\
-    vgg11, mobilenet_v3_large, mobilenet_v3_small
+    vgg11, vgg13, vgg16, vgg19, mobilenet_v3_large, mobilenet_v3_small
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
 
@@ -118,11 +118,15 @@ def get_model(args, n_classes):
                       'densenet169': densenet169, 'densenet201': densenet201, 'mobilenet_v2': mobilenet_v2,
                       'inception_v3': inception_v3, 'alexnet': alexnet, 'squeezenet': squeezenet1_0,
                       'shufflenet': shufflenet_v2_x1_0, 'wide_resnet50_2': wide_resnet50_2,
-                      'wide_resnet101_2': wide_resnet101_2, 'vgg11': vgg11, 'mobilenet_v3_large': mobilenet_v3_large,
-                      'mobilenet_v3_small': mobilenet_v3_small
+                      'wide_resnet101_2': wide_resnet101_2, 'vgg11': vgg11, 'vgg13': vgg13, 'vgg16': vgg16, 'vgg19': vgg19,
+                      'mobilenet_v3_large': mobilenet_v3_large, 'mobilenet_v3_small': mobilenet_v3_small
                       }
     timm_models = {'inception_resnet_v2', 'inception_v4', 'efficientnet_b0', 'efficientnet_b1',
-                   'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'vit_base_patch16_224'}
+                   'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5',
+                   'efficientnet_b6', 'efficientnet_b7', 'tf_efficientnetv2_s', 'tf_efficientnetv2_m',
+                   'tf_efficientnetv2_l', 'vit_base_patch16_224', 'vit_large_patch16_224',
+                   'convnext_base', 'convnext_large', 'swin_base_patch4_window7_224',
+                   'mobilenetv4_conv_small', 'mobilenetv4_conv_medium', 'mobilenetv4_conv_large'}
 
     if args.model in pytorch_models.keys() and not args.pretrained:
         if args.model == 'inception_v3':
@@ -135,7 +139,7 @@ def get_model(args, n_classes):
             model = pytorch_models[args.model](pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, n_classes)
-        elif args.model in {'alexnet', 'vgg11'}:
+        elif args.model in {'alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19'}:
             model = pytorch_models[args.model](pretrained=True)
             num_ftrs = model.classifier[6].in_features
             model.classifier[6] = nn.Linear(num_ftrs, n_classes)

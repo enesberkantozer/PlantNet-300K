@@ -34,10 +34,15 @@ def _add_model_parser(parser):
                                                  'densenet121', 'densenet161', 'densenet169', 'densenet201',
                                                  'mobilenet_v2', 'inception_v3', 'alexnet', 'squeezenet',
                                                  'shufflenet', 'wide_resnet50_2', 'wide_resnet101_2',
-                                                 'vgg11', 'mobilenet_v3_large', 'mobilenet_v3_small',
+                                                 'vgg11', 'vgg13', 'vgg16', 'vgg19',
+                                                 'mobilenet_v3_large', 'mobilenet_v3_small',
                                                  'inception_resnet_v2', 'inception_v4', 'efficientnet_b0',
                                                  'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3',
-                                                 'efficientnet_b4', 'vit_base_patch16_224'],
+                                                 'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6',
+                                                 'efficientnet_b7', 'tf_efficientnetv2_s', 'tf_efficientnetv2_m',
+                                                 'tf_efficientnetv2_l', 'vit_base_patch16_224', 'vit_large_patch16_224',
+                                                 'convnext_base', 'convnext_large', 'swin_base_patch4_window7_224',
+                                                 'mobilenetv4_conv_small', 'mobilenetv4_conv_medium', 'mobilenetv4_conv_large'],
                              default='resnet50', help='choose the model you want to train on')
 
 
