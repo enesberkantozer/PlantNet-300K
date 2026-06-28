@@ -130,37 +130,37 @@ def get_model(args, n_classes):
 
     if args.model in pytorch_models.keys() and not args.pretrained:
         if args.model == 'inception_v3':
-            model = pytorch_models[args.model](pretrained=False, num_classes=n_classes, aux_logits=False)
+            model = pytorch_models[args.model](weights=None, num_classes=n_classes, aux_logits=False)
         else:
-            model = pytorch_models[args.model](pretrained=False, num_classes=n_classes)
+            model = pytorch_models[args.model](weights=None, num_classes=n_classes)
     elif args.model in pytorch_models.keys() and args.pretrained:
         if args.model in {'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'wide_resnet50_2',
                           'wide_resnet101_2', 'shufflenet'}:
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, n_classes)
         elif args.model in {'alexnet', 'vgg11', 'vgg13', 'vgg16', 'vgg19'}:
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             num_ftrs = model.classifier[6].in_features
             model.classifier[6] = nn.Linear(num_ftrs, n_classes)
         elif args.model in {'densenet121', 'densenet161', 'densenet169', 'densenet201'}:
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             num_ftrs = model.classifier.in_features
             model.classifier = nn.Linear(num_ftrs, n_classes)
         elif args.model == 'mobilenet_v2':
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             num_ftrs = model.classifier[1].in_features
             model.classifier[1] = nn.Linear(num_ftrs, n_classes)
         elif args.model == 'inception_v3':
-            model = inception_v3(pretrained=True, aux_logits=False)
+            model = inception_v3(weights='DEFAULT', aux_logits=False)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, n_classes)
         elif args.model == 'squeezenet':
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             model.classifier[1] = nn.Conv2d(512, n_classes, kernel_size=(1, 1), stride=(1, 1))
             model.num_classes = n_classes
         elif args.model == 'mobilenet_v3_large' or args.model == 'mobilenet_v3_small':
-            model = pytorch_models[args.model](pretrained=True)
+            model = pytorch_models[args.model](weights='DEFAULT')
             num_ftrs = model.classifier[-1].in_features
             model.classifier[-1] = nn.Linear(num_ftrs, n_classes)
 
@@ -201,25 +201,24 @@ def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained):
                                                                                          std=[0.2353, 0.2219, 0.2325])])
 
     pin_memory = torch.cuda.is_available()
-    persistent_workers = num_workers > 0
 
     trainset = Plantnet(root, 'train', transform=transform_train)
     train_class_to_num_instances = Counter(trainset.targets)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                               shuffle=True, num_workers=num_workers,
-                                              pin_memory=pin_memory, persistent_workers=persistent_workers)
+                                              pin_memory=pin_memory)
 
     valset = Plantnet(root, 'val', transform=transform_test)
 
     valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
                                             shuffle=True, num_workers=num_workers,
-                                            pin_memory=pin_memory, persistent_workers=persistent_workers)
+                                            pin_memory=pin_memory)
 
     testset = Plantnet(root, 'test', transform=transform_test)
     test_class_to_num_instances = Counter(testset.targets)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
                                              shuffle=False, num_workers=num_workers,
-                                             pin_memory=pin_memory, persistent_workers=persistent_workers)
+                                             pin_memory=pin_memory)
 
     val_class_to_num_instances = Counter(valset.targets)
     n_classes = len(trainset.classes)

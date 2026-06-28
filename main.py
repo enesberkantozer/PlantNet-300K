@@ -56,7 +56,7 @@ def train(args):
     lmbda_best_acc = None
     best_val_acc = float('-inf')
 
-    scaler = torch.cuda.amp.GradScaler() if args.use_gpu else None
+    scaler = torch.amp.GradScaler('cuda') if args.use_gpu else None
 
     for epoch in range(1, args.n_epochs + 1):
         print(f"\n[{epoch}/{args.n_epochs}] Starting epoch...")

@@ -28,7 +28,7 @@ def train_epoch(model, optimizer, train_loader, criteria, loss_train, acc_train,
         optimizer.zero_grad(set_to_none=True)
         
         if scaler is not None:
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 batch_output_train = model(batch_x_train)
                 loss_batch_train = criteria(batch_output_train, batch_y_train)
             
@@ -98,7 +98,7 @@ def val_epoch(model, val_loader, criteria, loss_val, acc_val, topk_acc_val, avgk
             if use_gpu:
                 batch_x_val, batch_y_val = batch_x_val.cuda(non_blocking=True), batch_y_val.cuda(non_blocking=True)
             
-            with torch.cuda.amp.autocast(enabled=bool(use_gpu)):
+            with torch.amp.autocast('cuda', enabled=bool(use_gpu)):
                 batch_output_val = model(batch_x_val)
                 loss_batch_val = criteria(batch_output_val, batch_y_val)
                 
@@ -183,7 +183,7 @@ def test_epoch(model, test_loader, criteria, list_k, lmbda, use_gpu, dataset_att
         for batch_idx, (batch_x_test, batch_y_test) in enumerate(tqdm(test_loader, desc='test', position=0)):
             if use_gpu:
                 batch_x_test, batch_y_test = batch_x_test.cuda(non_blocking=True), batch_y_test.cuda(non_blocking=True)
-            with torch.cuda.amp.autocast(enabled=bool(use_gpu)):
+            with torch.amp.autocast('cuda', enabled=bool(use_gpu)):
                 batch_output_test = model(batch_x_test)
                 loss_batch_test = criteria(batch_output_test, batch_y_test)
                 
