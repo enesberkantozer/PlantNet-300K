@@ -183,7 +183,7 @@ class Plantnet(ImageFolder):
         return os.path.join(self.root, self.split)
 
 
-def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained):
+def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained, distributed=False, local_rank=0, world_size=1):
 
     if pretrained:
         transform_train = transforms.Compose([transforms.Resize(size=image_size), transforms.RandomCrop(size=crop_size),
@@ -203,23 +203,40 @@ def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained):
     pin_memory = torch.cuda.is_available()
 
     trainset = Plantnet(root, 'train', transform=transform_train)
-    train_class_to_num_instances = Counter(trainset.targets)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                              shuffle=True, num_workers=num_workers,
-                                              pin_memory=pin_memory)
-
     valset = Plantnet(root, 'val', transform=transform_test)
-
-    valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
-                                            shuffle=True, num_workers=num_workers,
-                                            pin_memory=pin_memory)
-
     testset = Plantnet(root, 'test', transform=transform_test)
-    test_class_to_num_instances = Counter(testset.targets)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             shuffle=False, num_workers=num_workers,
-                                             pin_memory=pin_memory)
 
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=world_size, rank=local_rank)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=world_size, rank=local_rank, shuffle=False)
+        test_sampler = torch.utils.data.distributed.DistributedSampler(testset, num_replicas=world_size, rank=local_rank, shuffle=False)
+        
+        nw = max(0, num_workers // world_size)
+        prefetch_factor = 4 if nw > 0 else None
+        
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+                                                  shuffle=False, sampler=train_sampler, num_workers=nw,
+                                                  pin_memory=pin_memory, prefetch_factor=prefetch_factor)
+        valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
+                                                shuffle=False, sampler=val_sampler, num_workers=nw,
+                                                pin_memory=pin_memory, prefetch_factor=prefetch_factor)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
+                                                 shuffle=False, sampler=test_sampler, num_workers=nw,
+                                                 pin_memory=pin_memory, prefetch_factor=prefetch_factor)
+    else:
+        train_sampler = None
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+                                                  shuffle=True, num_workers=num_workers,
+                                                  pin_memory=pin_memory)
+        valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
+                                                shuffle=True, num_workers=num_workers,
+                                                pin_memory=pin_memory)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
+                                                 shuffle=False, num_workers=num_workers,
+                                                 pin_memory=pin_memory)
+
+    train_class_to_num_instances = Counter(trainset.targets)
+    test_class_to_num_instances = Counter(testset.targets)
     val_class_to_num_instances = Counter(valset.targets)
     n_classes = len(trainset.classes)
 
@@ -229,4 +246,4 @@ def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained):
                                                   'test': test_class_to_num_instances},
                           'class_to_idx': trainset.class_to_idx}
 
-    return trainloader, valloader, testloader, dataset_attributes
+    return trainloader, valloader, testloader, dataset_attributes, train_sampler
