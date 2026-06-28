@@ -23,6 +23,7 @@ def train(args):
 
     if args.use_gpu:
         print('USING GPU')
+        torch.backends.cudnn.benchmark = True
         if args.num_gpus > 1 and torch.cuda.device_count() >= args.num_gpus:
             print(f'USING {args.num_gpus} GPUs!')
             model = torch.nn.DataParallel(model, device_ids=list(range(args.num_gpus)))
@@ -55,6 +56,8 @@ def train(args):
     lmbda_best_acc = None
     best_val_acc = float('-inf')
 
+    scaler = torch.cuda.amp.GradScaler() if args.use_gpu else None
+
     for epoch in range(1, args.n_epochs + 1):
         print(f"\n[{epoch}/{args.n_epochs}] Starting epoch...")
         t = time.time()
@@ -64,7 +67,7 @@ def train(args):
                                                                               criteria, loss_train, acc_train,
                                                                               topk_acc_train, args.k,
                                                                               dataset_attributes['n_train'],
-                                                                              args.use_gpu)
+                                                                              args.use_gpu, scaler)
 
         loss_epoch_val, acc_epoch_val, topk_acc_epoch_val, \
         avgk_acc_epoch_val, lmbda_val, p_val, r_val, f_val = val_epoch(model, val_loader, criteria,

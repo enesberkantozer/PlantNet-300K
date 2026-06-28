@@ -200,20 +200,26 @@ def get_data(root, image_size, crop_size, batch_size, num_workers, pretrained):
                                              transforms.ToTensor(), transforms.Normalize(mean=[0.4425, 0.4695, 0.3266],
                                                                                          std=[0.2353, 0.2219, 0.2325])])
 
+    pin_memory = torch.cuda.is_available()
+    persistent_workers = num_workers > 0
+
     trainset = Plantnet(root, 'train', transform=transform_train)
     train_class_to_num_instances = Counter(trainset.targets)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                              shuffle=True, num_workers=num_workers)
+                                              shuffle=True, num_workers=num_workers,
+                                              pin_memory=pin_memory, persistent_workers=persistent_workers)
 
     valset = Plantnet(root, 'val', transform=transform_test)
 
     valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
-                                            shuffle=True, num_workers=num_workers)
+                                            shuffle=True, num_workers=num_workers,
+                                            pin_memory=pin_memory, persistent_workers=persistent_workers)
 
     testset = Plantnet(root, 'test', transform=transform_test)
     test_class_to_num_instances = Counter(testset.targets)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             shuffle=False, num_workers=num_workers)
+                                             shuffle=False, num_workers=num_workers,
+                                             pin_memory=pin_memory, persistent_workers=persistent_workers)
 
     val_class_to_num_instances = Counter(valset.targets)
     n_classes = len(trainset.classes)
